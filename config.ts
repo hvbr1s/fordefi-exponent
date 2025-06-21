@@ -15,8 +15,7 @@ export interface FordefiSolanaConfig {
 export interface ExponentConfig {
   market: string;
   investAmount: bigint;
-  action: "buy" | "sell";
-  existingAlt?: string;
+  action: "buy" | "sell"
 };
 
 export const fordefiConfig: FordefiSolanaConfig = {
@@ -30,8 +29,7 @@ export const fordefiConfig: FordefiSolanaConfig = {
 export const exponentConfig: ExponentConfig = {
   market: "EJ4GPTCnNtemBVrT7QKhRfSKfM53aV2UJYGAC8gdVz5b", // fragSOL market
   investAmount: 1_000n, // in smallest fragSOL units (9 decimals -> https://solscan.io/token/FRAGSEthVFL7fdqM8hxfxkfCZzUvmg21cqPJVvC1qdbo)
-  action: "buy", // buy -> to aquire PT tokens / sell -> to aquire fragSOL
-  //existingAlt: "699rHEoERjt9haWJDRyhWDQXJFsUVxKPN9XucM2W2Gz6", // <-- If you've already created and extended your ALT add it here
+  action: "sell", // buy -> to aquire PT tokens / sell -> to aquire fragSOL
 };
 
 export const connection = new Connection('https://api.mainnet-beta.solana.com');

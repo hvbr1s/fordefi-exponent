@@ -5,3 +5,4 @@ secret/*
 package-lock.json
 txs/*
 bin
+.DS_Store
