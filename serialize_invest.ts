@@ -251,7 +251,6 @@ export async function createSetupPayload(
   const owner = new PublicKey(fordefiConfig.fordefiSolanaVaultAddress);
   const connection = new Connection('https://api.mainnet-beta.solana.com');
 
-  // We only need the setup instructions for this transaction
   const { setupIxs } = await getInstructions(owner, exponentConfig);
 
   if (setupIxs.length === 0) {
@@ -259,10 +258,24 @@ export async function createSetupPayload(
     return null;
   }
 
+  // Check which of the required Associated Token Accounts already exist.
+  // The ATA address is the second key in the `createAssociatedTokenAccount` instruction.
+  const ataAddresses = setupIxs.map(ix => ix.keys[1]?.pubkey).filter(Boolean) as PublicKey[];
+  const existingAccounts = await connection.getMultipleAccountsInfo(ataAddresses);
+
+  // Filter for instructions where the account does not exist yet (is null).
+  const neededSetupIxs = setupIxs.filter((_, index) => existingAccounts[index] === null);
+
+  if (neededSetupIxs.length === 0) {
+    console.log('All required Associated Token Accounts already exist. Skipping setup transaction.');
+    return null;
+  }
+
+  console.log(`Found ${neededSetupIxs.length} new Associated Token Accounts to create.`);
   const serializedMessage = await createAndSerializeTransaction(
     connection,
     owner,
-    setupIxs,
+    neededSetupIxs, // Only include instructions for non-existent accounts
     [lookupTable]
   );
   

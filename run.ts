@@ -56,7 +56,6 @@ async function main(): Promise<void> {
     console.log('--- Step 1: Complete ---');
   }
   
-  
   // --- Step 2: Extend Address Lookup Table ---
   console.log('\n--- Step 2: Extending Address Lookup Table ---');
 
