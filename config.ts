@@ -1,3 +1,4 @@
+import { Connection } from '@solana/web3.js'
 import dotenv from 'dotenv'
 import fs from 'fs'
 
@@ -36,3 +37,5 @@ export const exponentConfig: ExponentConfig = {
   action: "buy", // buy -> to aquire PT tokens / sell -> to aquire fragSOL
   existingAlt: "AXc94U7cQUyWkoFjRJuuAa2nhb7zgu4c46yTpt72Skpm", // <-- If you've already created and extended your ALT add it here
 };
+
+export const connection = new Connection('https://api.mainnet-beta.solana.com');
