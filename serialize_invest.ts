@@ -1,4 +1,4 @@
-import { Connection, PublicKey, TransactionInstruction, VersionedTransaction, MessageV0, AddressLookupTableProgram, AddressLookupTableAccount, TransactionMessage, ComputeBudgetProgram } from '@solana/web3.js';
+import { Connection, PublicKey, TransactionInstruction, VersionedTransaction, AddressLookupTableAccount, TransactionMessage, ComputeBudgetProgram } from '@solana/web3.js';
 import { LOCAL_ENV, Market } from "@exponent-labs/exponent-sdk";
 import { FordefiSolanaConfig, ExponentConfig} from './config'
 import { createAndSignTx } from './utils/process_tx'
@@ -151,14 +151,13 @@ export async function simulateSellPt(marketAddress: string, ptInAmount: number) 
     const estimatedBaseAsset = sdk.marketCalculator().calcTradePt(-ptInAmount);
     console.log(`Estimated base asset for selling ${ptInAmount} PT:`, estimatedBaseAsset);
     
-    // Use the correct property name from the actual object structure
     const netAssetOut = estimatedBaseAsset.netTraderAsset;
     
     if (netAssetOut === undefined) {
       throw new Error('Could not find output amount in CalculatorTradeResult');
     }
     
-    return BigInt(Math.floor(netAssetOut)); // Round down to integer before converting
+    return BigInt(Math.floor(netAssetOut));
   } catch (error) {
     console.error('Error simulating sell PT:', error);
     throw error;
