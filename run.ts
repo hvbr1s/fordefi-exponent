@@ -10,8 +10,8 @@ import {
 } from './serialize_invest'
 import { pushToJito } from './utils/push_to_jito'
 import { signWithApiSigner } from './signer';
-import { fordefiConfig, FordefiSolanaConfig, exponentConfig } from './config';
-import { Connection, PublicKey } from '@solana/web3.js'
+import { fordefiConfig, FordefiSolanaConfig, exponentConfig, connection } from './config';
+import { PublicKey } from '@solana/web3.js'
 
 async function sendPayloadToFordefi(payload: any, fordefiConfig: FordefiSolanaConfig) {
   const requestBody = JSON.stringify(payload);
@@ -22,7 +22,6 @@ async function sendPayloadToFordefi(payload: any, fordefiConfig: FordefiSolanaCo
   const response = await createAndSignTx(fordefiConfig.apiPathEndpoint, fordefiConfig.accessToken, signature, timestamp, requestBody);
   console.log('Fordefi API Response:', response.data);
 
-  // It can take a moment for the transaction to be visible on-chain.
   console.log('Waiting for on-chain confirmation...');
   await new Promise(resolve => setTimeout(resolve, 5000)); 
 
@@ -38,22 +37,21 @@ async function main(): Promise<void> {
   // Log market info at the start
   await getMarketInfo(exponentConfig.market);
 
-  const connection = new Connection('https://api.mainnet-beta.solana.com');
   const fordefiVault = new PublicKey(fordefiConfig.fordefiSolanaVaultAddress);
   let lookupTableAddress: PublicKey;
 
-  // This script follows a multi-step process to handle large transactions using an Address Lookup Table (LUT).
+  // This script follows a multi-step process to handle large transactions using an Address Lookup Table (ALT).
   if (exponentConfig.existingAlt) {
     console.log(`--- Reusing existing Address Lookup Table: ${exponentConfig.existingAlt} ---`);
     lookupTableAddress = new PublicKey(exponentConfig.existingAlt);
-    // We skip Step 1 since the LUT already exists.
+    // We skip Step 1 since the ALT already exists.
   } else {
     // --- Step 1: Create Address Lookup Table ---
     console.log('--- Step 1: Creating Address Lookup Table ---');
     const { payload: createLutPayload, lookupTableAddress: newLutAddress } = await createLookupTablePayload(connection, fordefiVault, fordefiConfig);
     lookupTableAddress = newLutAddress;
     
-    console.log(`The new LUT address will be: ${lookupTableAddress.toBase58()}`);
+    console.log(`The new ALT address will be: ${lookupTableAddress.toBase58()}`);
     await sendPayloadToFordefi(createLutPayload, fordefiConfig);
     console.log('--- Step 1: Complete ---');
   }
@@ -65,10 +63,10 @@ async function main(): Promise<void> {
   // First, fetch the current state of the ALT
   const lutAccount = (await connection.getAddressLookupTable(lookupTableAddress)).value;
   if (!lutAccount) {
-    throw new Error(`Failed to fetch LUT: ${lookupTableAddress.toBase58()}`);
+    throw new Error(`Failed to fetch ALT: ${lookupTableAddress.toBase58()}`);
   }
   const existingAddresses = new Set(lutAccount.state.addresses.map(addr => addr.toBase58()));
-  console.log(`LUT currently has ${existingAddresses.size} addresses.`);
+  console.log(`ALT currently has ${existingAddresses.size} addresses.`);
 
   // Determine which addresses are required for our transaction
   const { setupIxs, ixs } = exponentConfig.action === 'buy'
