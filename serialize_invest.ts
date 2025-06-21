@@ -1,20 +1,36 @@
 import { Connection, PublicKey, TransactionInstruction, VersionedTransaction, MessageV0, AddressLookupTableProgram, AddressLookupTableAccount, TransactionMessage, ComputeBudgetProgram } from '@solana/web3.js';
 import { LOCAL_ENV, Market } from "@exponent-labs/exponent-sdk";
 import { FordefiSolanaConfig, ExponentConfig} from './config'
+import { createAndSignTx } from './utils/process_tx'
+import { signWithApiSigner } from './signer';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-// Market SDK instance cache
 let marketSdk: Market | null = null;
 
-async function getMarketSdk(marketAddress: string): Promise<Market> {
+export async function getMarketSdk(marketAddress: string): Promise<Market> {
   if (!marketSdk) {
     const connection = new Connection('https://api.mainnet-beta.solana.com');
     const market = new PublicKey(marketAddress);
     marketSdk = await Market.load(LOCAL_ENV, connection, market);
   }
   return marketSdk;
+}
+
+export async function sendPayloadToFordefi(payload: any, fordefiConfig: FordefiSolanaConfig) {
+  const requestBody = JSON.stringify(payload);
+  const timestamp = new Date().getTime();
+  const signature = await signWithApiSigner(`${fordefiConfig.apiPathEndpoint}|${timestamp}|${requestBody}`, fordefiConfig.privateKeyPem);
+  
+  console.log('Sending payload to Fordefi...');
+  const response = await createAndSignTx(fordefiConfig.apiPathEndpoint, fordefiConfig.accessToken, signature, timestamp, requestBody);
+  console.log('Fordefi API Response:', response.data);
+
+  console.log('Waiting for on-chain confirmation...');
+  await new Promise(resolve => setTimeout(resolve, 5000)); 
+
+  return response.data;
 }
 
 function buildFordefiRequestBody(
@@ -215,66 +231,15 @@ export async function createRedeemInstruction(
   }
 }
 
-export async function createLookupTablePayload(
-  connection: Connection,
-  fordefiVault: PublicKey,
-  fordefiConfig: FordefiSolanaConfig
-) {
-  const recentSlot = await connection.getSlot();
-  const [createIx, tableAddress] = AddressLookupTableProgram.createLookupTable({
-    authority: fordefiVault,
-    payer: fordefiVault,
-    recentSlot
-  });
-  
-  console.debug(`Your ALT will be created at https://solscan.io/account/${tableAddress}`);
-  
-  const serializedMessage = await createAndSerializeTransaction(
-    connection,
-    fordefiVault,
-    [createIx]
-  );
-  
-  return {
-    payload: buildFordefiRequestBody(fordefiConfig, serializedMessage),
-    lookupTableAddress: tableAddress
-  };
-}
-
-export async function extendLookupTablePayload(
-  connection: Connection,
-  fordefiVault: PublicKey,
-  fordefiConfig: FordefiSolanaConfig,
-  tableAddress: PublicKey,
-  addresses: PublicKey[]
-) {
-  const extendIx = AddressLookupTableProgram.extendLookupTable({
-    payer: fordefiVault,
-    authority: fordefiVault,
-    lookupTable: tableAddress,
-    addresses: addresses,
-  });
-  
-  const serializedMessage = await createAndSerializeTransaction(
-    connection,
-    fordefiVault,
-    [extendIx]
-  );
-  
-  return buildFordefiRequestBody(fordefiConfig, serializedMessage);
-}
-
 // Create a payload for the setup transaction
 export async function createSetupPayload(
   fordefiConfig: FordefiSolanaConfig,
-  exponentConfig: ExponentConfig,
+  setupIxs: TransactionInstruction[],
   lookupTable: AddressLookupTableAccount
 ) {
   console.log('=== Creating Setup Transaction Payload ===');
   const owner = new PublicKey(fordefiConfig.fordefiSolanaVaultAddress);
   const connection = new Connection('https://api.mainnet-beta.solana.com');
-
-  const { setupIxs } = await getInstructions(owner, exponentConfig);
 
   if (setupIxs.length === 0) {
     console.log('No setup instructions needed.');
@@ -309,6 +274,7 @@ export async function createSetupPayload(
 export async function createInvestPayload(
   fordefiConfig: FordefiSolanaConfig,
   exponentConfig: ExponentConfig,
+  ixs: TransactionInstruction[],
   lookupTable: AddressLookupTableAccount
 ) {
   console.log('=== Exponent Market SDK Investment ===');
@@ -318,8 +284,6 @@ export async function createInvestPayload(
   const owner = new PublicKey(fordefiConfig.fordefiSolanaVaultAddress);
   const connection = new Connection('https://api.mainnet-beta.solana.com');
   
-  
-  const { ixs } = await getInstructions(owner, exponentConfig);  
   const serializedMessage = await createAndSerializeTransaction(
     connection,
     owner,
@@ -330,8 +294,7 @@ export async function createInvestPayload(
   return buildFordefiRequestBody(fordefiConfig, serializedMessage);
 }
 
-// Helper to get both setup and main instructions
-async function getInstructions(owner: PublicKey, exponentConfig: ExponentConfig) {
+export async function getInstructions(owner: PublicKey, exponentConfig: ExponentConfig) {
   switch (exponentConfig.action) {
     case 'buy':
       const estimatedPt = await simulateBuyPt(exponentConfig.market, Number(exponentConfig.investAmount));
