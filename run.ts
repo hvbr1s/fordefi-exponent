@@ -6,9 +6,9 @@ import {
   createLookupTablePayload, 
   extendLookupTablePayload,
   createBuyPtInstruction,
-  createSellPtInstruction
-} from './serialize_invest'
-import { pushToJito } from './utils/push_to_jito'
+  createSellPtInstruction,
+  waitForLookupTable
+} from './serialize_invest';
 import { signWithApiSigner } from './signer';
 import { fordefiConfig, FordefiSolanaConfig, exponentConfig, connection } from './config';
 import { PublicKey } from '@solana/web3.js'
@@ -59,11 +59,8 @@ async function main(): Promise<void> {
   // --- Step 2: Extend Address Lookup Table ---
   console.log('\n--- Step 2: Extending Address Lookup Table ---');
 
-  // First, fetch the current state of the ALT
-  const lutAccount = (await connection.getAddressLookupTable(lookupTableAddress)).value;
-  if (!lutAccount) {
-    throw new Error(`Failed to fetch ALT: ${lookupTableAddress.toBase58()}`);
-  }
+  // Wait for the LUT to be available before trying to extend it
+  const lutAccount = await waitForLookupTable(connection, lookupTableAddress);
   const existingAddresses = new Set(lutAccount.state.addresses.map(addr => addr.toBase58()));
   console.log(`ALT currently has ${existingAddresses.size} addresses.`);
 
@@ -86,14 +83,14 @@ async function main(): Promise<void> {
   if (newAddresses.length === 0) {
     console.log('All required addresses are already in the ALT. Skipping extension.');
   } else {
-    console.log(`Found ${newAddresses.length} new addresses to add to the LUT.`);
+    console.log(`Found ${newAddresses.length} new addresses to add to the ALT.`);
     const addressesToExtend = newAddresses.map(addr => new PublicKey(addr));
     
     // Chunk and send the new addresses
     const chunkSize = 20;
     for (let i = 0; i < addressesToExtend.length; i += chunkSize) {
       const chunk = addressesToExtend.slice(i, i + chunkSize);
-      console.log(`\n--- Sending Chunk ${i / chunkSize + 1} to extend LUT with ${chunk.length} addresses ---`);
+      console.log(`\n--- Sending Chunk ${i / chunkSize + 1} to extend ALT with ${chunk.length} addresses ---`);
       const extendLutPayload = await extendLookupTablePayload(connection, fordefiVault, fordefiConfig, lookupTableAddress, chunk);
       await sendPayloadToFordefi(extendLutPayload, fordefiConfig);
     }
