@@ -58,12 +58,35 @@ async function createAndSerializeTransaction(
   const messageV0 = new TransactionMessage({
     payerKey,
     recentBlockhash,
-    instructions: [setComputeUnitLimitIx, setComputeUnitPriceIx, ...instructions], // Prepend compute budget instructions
+    instructions: [setComputeUnitLimitIx, setComputeUnitPriceIx, ...instructions],
   }).compileToV0Message(lookupTables);
   
   const tx = new VersionedTransaction(messageV0);
   
   return Buffer.from(tx.message.serialize()).toString('base64');
+}
+
+export async function waitForLookupTable(connection: Connection, lookupTableAddress: PublicKey, maxRetries: number = 10): Promise<AddressLookupTableAccount> {
+  console.log('Waiting for Address Lookup Table to be available...');
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const lutAccount = (await connection.getAddressLookupTable(lookupTableAddress)).value;
+      if (lutAccount) {
+        console.log(`✓ Address Lookup Table found after ${attempt} attempt(s)`);
+        return lutAccount;
+      }
+    } catch (error) {
+      console.log(`Attempt ${attempt}: ALT not ready yet...`);
+    }
+    
+    // Exponential backoff: 2^attempt seconds, max 30 seconds
+    const delay = Math.min(Math.pow(2, attempt), 30) * 1000;
+    console.log(`Waiting ${delay / 1000} seconds before retry...`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+  
+  throw new Error(`Failed to fetch ALT after ${maxRetries} attempts: ${lookupTableAddress.toBase58()}`);
 }
 
 // Get current market information
