@@ -1,4 +1,4 @@
-import { Connection, PublicKey, TransactionInstruction, VersionedTransaction, MessageV0, AddressLookupTableProgram, AddressLookupTableAccount, TransactionMessage } from '@solana/web3.js';
+import { Connection, PublicKey, TransactionInstruction, VersionedTransaction, MessageV0, AddressLookupTableProgram, AddressLookupTableAccount, TransactionMessage, ComputeBudgetProgram } from '@solana/web3.js';
 import { LOCAL_ENV, Market } from "@exponent-labs/exponent-sdk";
 import { FordefiSolanaConfig, ExponentConfig} from './run'
 import * as dotenv from 'dotenv';
@@ -48,10 +48,18 @@ async function createAndSerializeTransaction(
 ): Promise<string> {
   const recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
   
+  // Add instructions to request more compute units and set a priority fee.
+  const setComputeUnitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
+    units: 600_000, // Request more compute units for this complex transaction
+  });
+  const setComputeUnitPriceIx = ComputeBudgetProgram.setComputeUnitPrice({
+    microLamports: 10_000, // Set a small priority fee
+  });
+  
   const messageV0 = new TransactionMessage({
     payerKey,
     recentBlockhash,
-    instructions,
+    instructions: [setComputeUnitLimitIx, setComputeUnitPriceIx, ...instructions], // Prepend compute budget instructions
   }).compileToV0Message(lookupTables);
   
   const tx = new VersionedTransaction(messageV0);
@@ -62,6 +70,8 @@ async function createAndSerializeTransaction(
 // Get current market information
 export async function getMarketInfo(marketAddress: string) {
   const sdk = await getMarketSdk(marketAddress);
+  console.log('--- Market Info ---');
+  console.log('---------------------');
   console.log('Current SY exchange rate:', sdk.currentSyExchangeRate.toString());
   console.log('Current PT discount:', sdk.ptDiscount.toString());
   

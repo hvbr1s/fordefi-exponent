@@ -1,5 +1,6 @@
 import { createAndSignTx } from './utils/process_tx'
 import { 
+  getMarketInfo,
   createSetupPayload,
   createInvestPayload, 
   createLookupTablePayload, 
@@ -46,7 +47,7 @@ export const exponentConfig: ExponentConfig = {
   investAmount: 1_000n, // in smallest fragSOL units (9 decimals -> https://solscan.io/token/FRAGSEthVFL7fdqM8hxfxkfCZzUvmg21cqPJVvC1qdbo)
   useJito: false, // if true we'll use Jito instead of Fordefi to broadcast the signed transaction
   jitoTip: 1000, // Jito tip amount in lamports (1 SOL = 1e9 lamports)
-  action: "sell",
+  action: "buy",
   existingLutAddress: "AXc94U7cQUyWkoFjRJuuAa2nhb7zgu4c46yTpt72Skpm", // <-- PASTE YOUR EXISTING LUT ADDRESS HERE
 };
 
@@ -71,6 +72,9 @@ async function main(): Promise<void> {
     console.error('Error: Please set FORDEFI_API_TOKEN, SOLANA_VAULT_ID, and SOLANA_VAULT_ADDRESS environment variables.');
     return;
   }
+
+  // Log market info at the start
+  await getMarketInfo(exponentConfig.market);
 
   const connection = new Connection('https://api.mainnet-beta.solana.com');
   const fordefiVault = new PublicKey(fordefiConfig.fordefiSolanaVaultAddress);
@@ -97,25 +101,45 @@ async function main(): Promise<void> {
   
   // --- Step 2: Extend Address Lookup Table ---
   console.log('\n--- Step 2: Extending Address Lookup Table ---');
+
+  // First, fetch the current state of the LUT
+  const lutAccount = (await connection.getAddressLookupTable(lookupTableAddress)).value;
+  if (!lutAccount) {
+    throw new Error(`Failed to fetch LUT: ${lookupTableAddress.toBase58()}`);
+  }
+  const existingAddresses = new Set(lutAccount.state.addresses.map(addr => addr.toBase58()));
+  console.log(`LUT currently has ${existingAddresses.size} addresses.`);
+
+  // Determine which addresses are required for our transaction
   const { setupIxs, ixs } = exponentConfig.action === 'buy'
     ? await createBuyPtInstruction(exponentConfig.market, fordefiVault, 1n, 1n)
     : await createSellPtInstruction(exponentConfig.market, fordefiVault, 1n, 1n);
   
-  const tempInstructions = [...setupIxs, ...ixs];
+  const requiredInstructions = [...setupIxs, ...ixs];
 
-  const addressesToExtend = new Set<string>();
-  tempInstructions.forEach(ix => {
-    addressesToExtend.add(ix.programId.toBase58());
-    ix.keys.forEach(key => addressesToExtend.add(key.pubkey.toBase58()));
+  const requiredAddresses = new Set<string>();
+  requiredInstructions.forEach(ix => {
+    requiredAddresses.add(ix.programId.toBase58());
+    ix.keys.forEach(key => requiredAddresses.add(key.pubkey.toBase58()));
   });
-  const uniqueAddresses = Array.from(addressesToExtend).map(addr => new PublicKey(addr));
 
-  const chunkSize = 20;
-  for (let i = 0; i < uniqueAddresses.length; i += chunkSize) {
-    const chunk = uniqueAddresses.slice(i, i + chunkSize);
-    console.log(`\n--- Sending Chunk ${i / chunkSize + 1} to extend LUT ---`);
-    const extendLutPayload = await extendLookupTablePayload(connection, fordefiVault, fordefiConfig, lookupTableAddress, chunk);
-    await sendPayloadToFordefi(extendLutPayload, fordefiConfig);
+  // Filter for addresses that are not already in the LUT
+  const newAddresses = Array.from(requiredAddresses).filter(addr => !existingAddresses.has(addr));
+
+  if (newAddresses.length === 0) {
+    console.log('All required addresses are already in the LUT. Skipping extension.');
+  } else {
+    console.log(`Found ${newAddresses.length} new addresses to add to the LUT.`);
+    const addressesToExtend = newAddresses.map(addr => new PublicKey(addr));
+    
+    // Chunk and send the new addresses
+    const chunkSize = 20;
+    for (let i = 0; i < addressesToExtend.length; i += chunkSize) {
+      const chunk = addressesToExtend.slice(i, i + chunkSize);
+      console.log(`\n--- Sending Chunk ${i / chunkSize + 1} to extend LUT with ${chunk.length} addresses ---`);
+      const extendLutPayload = await extendLookupTablePayload(connection, fordefiVault, fordefiConfig, lookupTableAddress, chunk);
+      await sendPayloadToFordefi(extendLutPayload, fordefiConfig);
+    }
   }
   console.log('--- Step 2: Complete ---');
 
