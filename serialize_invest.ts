@@ -273,21 +273,23 @@ export async function createInvestPayload(
 }
 
 export async function getInstructions(owner: PublicKey, exponentConfig: ExponentConfig) {
+  const sdk = await getMarketSdk(exponentConfig.market);
+
   switch (exponentConfig.action) {
     case 'buy':
-      const estimatedPt = await simulateBuyPt(exponentConfig.market, Number(exponentConfig.investAmount));
+      const investAmountInBaseAsset = BigInt(Math.floor(Number(exponentConfig.investAmount) * sdk.currentSyExchangeRate));
+      const estimatedPt = await simulateBuyPt(exponentConfig.market, Number(investAmountInBaseAsset));
       if (!estimatedPt) {
         throw new Error('Could not estimate PT amount for buy');
       }
       
       const ptOut = estimatedPt * 99n / 100n; // 1% slippage tolerance
-      const maxBaseIn = exponentConfig.investAmount;
       
       return createBuyPtInstruction(
         exponentConfig.market,
         owner,
         ptOut,
-        maxBaseIn
+        investAmountInBaseAsset
       );
       
     case 'sell':
