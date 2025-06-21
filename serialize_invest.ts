@@ -1,6 +1,6 @@
 import { Connection, PublicKey, TransactionInstruction, VersionedTransaction, MessageV0, AddressLookupTableProgram, AddressLookupTableAccount, TransactionMessage, ComputeBudgetProgram } from '@solana/web3.js';
 import { LOCAL_ENV, Market } from "@exponent-labs/exponent-sdk";
-import { FordefiSolanaConfig, ExponentConfig} from './run'
+import { FordefiSolanaConfig, ExponentConfig} from './config'
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -48,9 +48,8 @@ async function createAndSerializeTransaction(
 ): Promise<string> {
   const recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
   
-  // Add instructions to request more compute units and set a priority fee.
   const setComputeUnitLimitIx = ComputeBudgetProgram.setComputeUnitLimit({
-    units: 600_000, // Request more compute units for this complex transaction
+    units: 600_000, // it's a complex tx, we need a lot of CU!
   });
   const setComputeUnitPriceIx = ComputeBudgetProgram.setComputeUnitPrice({
     microLamports: 10_000, // Set a small priority fee
@@ -71,7 +70,6 @@ async function createAndSerializeTransaction(
 export async function getMarketInfo(marketAddress: string) {
   const sdk = await getMarketSdk(marketAddress);
   console.log('--- Market Info ---');
-  console.log('---------------------');
   console.log('Current SY exchange rate:', sdk.currentSyExchangeRate.toString());
   console.log('Current PT discount:', sdk.ptDiscount.toString());
   
@@ -150,7 +148,7 @@ export async function createSellPtInstruction(
   }
 }
 
-// Create buy PT instruction - try without setup instructions first
+// Create buy PT instruction
 export async function createBuyPtInstruction(
   marketAddress: string, 
   owner: PublicKey, 
@@ -284,9 +282,8 @@ export async function createInvestPayload(
   const owner = new PublicKey(fordefiConfig.fordefiSolanaVaultAddress);
   const connection = new Connection('https://api.mainnet-beta.solana.com');
   
-  // We only need the main instructions for this transaction
-  const { ixs } = await getInstructions(owner, exponentConfig);
-    
+  
+  const { ixs } = await getInstructions(owner, exponentConfig);  
   const serializedMessage = await createAndSerializeTransaction(
     connection,
     owner,
@@ -335,16 +332,4 @@ async function getInstructions(owner: PublicKey, exponentConfig: ExponentConfig)
     default:
       throw new Error(`Unsupported action: ${exponentConfig.action}`);
   }
-}
-
-// Legacy function for backward compatibility
-export async function simulateInvest(fordefiConfig: FordefiSolanaConfig, exponentConfig: ExponentConfig) {
-  console.log('=== Exponent Market SDK Examples ===');
-  
-  // Get market info
-  await getMarketInfo(exponentConfig.market);
-  
-  // Example simulations (these don't require a signer)
-  await simulateBuyPt(exponentConfig.market, 1000); // Simulate buying PT with 1000 SOL worth
-  await simulateSellPt(exponentConfig.market, 500);  // Simulate selling 500 PT
 }

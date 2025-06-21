@@ -10,46 +10,8 @@ import {
 } from './serialize_invest'
 import { pushToJito } from './utils/push_to_jito'
 import { signWithApiSigner } from './signer';
-import { Connection, PublicKey, AddressLookupTableAccount, TransactionInstruction } from '@solana/web3.js'
-import dotenv from 'dotenv'
-import fs from 'fs'
-
-dotenv.config()
-
-export interface FordefiSolanaConfig {
-  accessToken: string;
-  vaultId: string;
-  fordefiSolanaVaultAddress: string;
-  privateKeyPem: string;
-  apiPathEndpoint: string;
-};
-
-export interface ExponentConfig {
-  market: string;
-  investAmount: bigint;
-  useJito: boolean;
-  jitoTip: number;
-  action: "buy" | "sell";
-  existingLutAddress?: string; // Optional: Provide an existing LUT address to reuse it
-};
-
-// Fordefi Config to configure
-export const fordefiConfig: FordefiSolanaConfig = {
-  accessToken: process.env.FORDEFI_API_TOKEN || "",
-  vaultId: process.env.SOLANA_VAULT_ID || "",
-  fordefiSolanaVaultAddress: process.env.SOLANA_VAULT_ADDRESS || "",
-  privateKeyPem: fs.readFileSync('./secret/private.pem', 'utf8'),
-  apiPathEndpoint: '/api/v1/transactions/create-and-wait'
-};
-
-export const exponentConfig: ExponentConfig = {
-  market: "EJ4GPTCnNtemBVrT7QKhRfSKfM53aV2UJYGAC8gdVz5b", // fragSOL market
-  investAmount: 1_000n, // in smallest fragSOL units (9 decimals -> https://solscan.io/token/FRAGSEthVFL7fdqM8hxfxkfCZzUvmg21cqPJVvC1qdbo)
-  useJito: false, // if true we'll use Jito instead of Fordefi to broadcast the signed transaction
-  jitoTip: 1000, // Jito tip amount in lamports (1 SOL = 1e9 lamports)
-  action: "buy",
-  existingLutAddress: "AXc94U7cQUyWkoFjRJuuAa2nhb7zgu4c46yTpt72Skpm", // <-- PASTE YOUR EXISTING LUT ADDRESS HERE
-};
+import { fordefiConfig, FordefiSolanaConfig, exponentConfig } from './config';
+import { Connection, PublicKey } from '@solana/web3.js'
 
 async function sendPayloadToFordefi(payload: any, fordefiConfig: FordefiSolanaConfig) {
   const requestBody = JSON.stringify(payload);
@@ -81,11 +43,9 @@ async function main(): Promise<void> {
   let lookupTableAddress: PublicKey;
 
   // This script follows a multi-step process to handle large transactions using an Address Lookup Table (LUT).
-  // NOTE: If a step fails, you may need to comment out completed steps and re-run.
-
-  if (exponentConfig.existingLutAddress) {
-    console.log(`--- Reusing existing Address Lookup Table: ${exponentConfig.existingLutAddress} ---`);
-    lookupTableAddress = new PublicKey(exponentConfig.existingLutAddress);
+  if (exponentConfig.existingAlt) {
+    console.log(`--- Reusing existing Address Lookup Table: ${exponentConfig.existingAlt} ---`);
+    lookupTableAddress = new PublicKey(exponentConfig.existingAlt);
     // We skip Step 1 since the LUT already exists.
   } else {
     // --- Step 1: Create Address Lookup Table ---
@@ -102,7 +62,7 @@ async function main(): Promise<void> {
   // --- Step 2: Extend Address Lookup Table ---
   console.log('\n--- Step 2: Extending Address Lookup Table ---');
 
-  // First, fetch the current state of the LUT
+  // First, fetch the current state of the ALT
   const lutAccount = (await connection.getAddressLookupTable(lookupTableAddress)).value;
   if (!lutAccount) {
     throw new Error(`Failed to fetch LUT: ${lookupTableAddress.toBase58()}`);
@@ -123,11 +83,11 @@ async function main(): Promise<void> {
     ix.keys.forEach(key => requiredAddresses.add(key.pubkey.toBase58()));
   });
 
-  // Filter for addresses that are not already in the LUT
+  // Filter for addresses that are not already in the ALT
   const newAddresses = Array.from(requiredAddresses).filter(addr => !existingAddresses.has(addr));
 
   if (newAddresses.length === 0) {
-    console.log('All required addresses are already in the LUT. Skipping extension.');
+    console.log('All required addresses are already in the ALT. Skipping extension.');
   } else {
     console.log(`Found ${newAddresses.length} new addresses to add to the LUT.`);
     const addressesToExtend = newAddresses.map(addr => new PublicKey(addr));
@@ -166,8 +126,6 @@ async function main(): Promise<void> {
   // --- Step 4: Execute the Investment Transaction ---
   console.log('\n--- Step 4: Executing the Investment ---');
 
-  // We refetch the lookup table here in case it took a while for the setup tx to finalize.
-  // Although not strictly necessary if the setup tx doesn't modify the LUT.
   const finalLookupTableAccount = (await connection.getAddressLookupTable(lookupTableAddress)).value;
   if (!finalLookupTableAccount) {
     console.error(`Failed to fetch the lookup table: ${lookupTableAddress}.`);
