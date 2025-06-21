@@ -209,27 +209,6 @@ export async function createBuyPtInstruction(
   }
 }
 
-// Create redeem at maturity instruction
-export async function createRedeemInstruction(
-  marketAddress: string,
-  owner: PublicKey, 
-  amountPy: bigint
-): Promise<TransactionInstruction[]> {
-  try {
-    const sdk = await getMarketSdk(marketAddress);
-    const redeemIx = await sdk.vault.ixMergeToBase({
-      owner,
-      amountPy
-    });
-    
-    console.log('Redeem at maturity instruction created:', redeemIx);
-    return [...redeemIx.setupIxs, ...redeemIx.ixs]; // Return all instructions
-  } catch (error) {
-    console.error('Error creating redeem instruction:', error);
-    throw error;
-  }
-}
-
 // Create a payload for the setup transaction
 export async function createSetupPayload(
   fordefiConfig: FordefiSolanaConfig,
@@ -262,7 +241,7 @@ export async function createSetupPayload(
   const serializedMessage = await createAndSerializeTransaction(
     connection,
     owner,
-    neededSetupIxs, // Only include instructions for non-existent accounts
+    neededSetupIxs,
     [lookupTable]
   );
   
@@ -278,7 +257,7 @@ export async function createInvestPayload(
 ) {
   console.log('=== Exponent Market SDK Investment ===');
   console.log(`Action: ${exponentConfig.action}`);
-  console.log(`Amount: ${exponentConfig.investAmount} lamports`);
+  console.log(`Amount: ${exponentConfig.investAmount}`);
   
   const owner = new PublicKey(fordefiConfig.fordefiSolanaVaultAddress);
   const connection = new Connection('https://api.mainnet-beta.solana.com');
