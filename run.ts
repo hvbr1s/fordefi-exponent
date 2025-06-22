@@ -62,7 +62,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const finalPayload = await createInvestPayload(fordefiConfig, exponentConfig, ixs, finalLookupTableAccount);
+  const finalPayload = await createInvestPayload(fordefiConfig, exponentConfig, ixs, finalLookupTableAccount, connection);
   
   await sendPayloadToFordefi(finalPayload, fordefiConfig);
   console.log('--- Step 2: Complete ---');
