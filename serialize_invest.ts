@@ -4,9 +4,6 @@ import { FordefiSolanaConfig, ExponentConfig} from './config'
 import { getPriorityFees } from './utils/get_priority_fees'
 import { createAndSignTx } from './utils/process_tx'
 import { signWithApiSigner } from './signer';
-import * as dotenv from 'dotenv';
-
-dotenv.config();
 
 let marketSdk: Market | null = null;
 
@@ -255,14 +252,14 @@ export async function createInvestPayload(
   fordefiConfig: FordefiSolanaConfig,
   exponentConfig: ExponentConfig,
   ixs: TransactionInstruction[],
-  lookupTable: AddressLookupTableAccount
+  lookupTable: AddressLookupTableAccount,
+  connection: Connection
 ) {
   console.log('=== Exponent Market SDK Investment ===');
   console.log(`Action: ${exponentConfig.action}`);
   console.log(`Amount: ${exponentConfig.investAmount}`);
   
   const owner = new PublicKey(fordefiConfig.fordefiSolanaVaultAddress);
-  const connection = new Connection('https://api.mainnet-beta.solana.com');
   
   const serializedMessage = await createAndSerializeTransaction(
     connection,
