@@ -30,7 +30,7 @@ export async function sendPayloadToFordefi(payload: any, fordefiConfig: FordefiS
   return response.data;
 }
 
-function buildFordefiRequestBody(
+async function buildFordefiRequestBody(
   fordefiConfig: FordefiSolanaConfig,
   serializedMessage: string
 ) {
@@ -141,7 +141,6 @@ export async function simulateBuyPt(marketAddress: string, baseAssetAmount: numb
   }
 }
 
-// Simulate selling PT for base asset
 export async function simulateSellPt(marketAddress: string, ptInAmount: number, connection: Connection) {
   try {
     const sdk = await getMarketSdk(marketAddress, connection);
@@ -208,7 +207,6 @@ export async function createBuyPtInstruction(
   }
 }
 
-// Create a payload for the setup transaction
 export async function createSetupPayload(
   fordefiConfig: FordefiSolanaConfig,
   setupIxs: TransactionInstruction[],
@@ -244,10 +242,9 @@ export async function createSetupPayload(
     [lookupTable]
   );
   
-  return buildFordefiRequestBody(fordefiConfig, serializedMessage);
+  return await buildFordefiRequestBody(fordefiConfig, serializedMessage);
 }
 
-// Create a payload for the main investment transaction
 export async function createInvestPayload(
   fordefiConfig: FordefiSolanaConfig,
   exponentConfig: ExponentConfig,
