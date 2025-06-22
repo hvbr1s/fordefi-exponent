@@ -1,4 +1,3 @@
-import { Connection } from '@solana/web3.js'
 import dotenv from 'dotenv'
 import fs from 'fs'
 
@@ -32,4 +31,4 @@ export const exponentConfig: ExponentConfig = {
   action: "buy", // buy -> to aquire PT tokens / sell -> to aquire fragSOL
 };
 
-export const connection = new Connection('https://api.mainnet-beta.solana.com');
+export const rpcUrl = "https://api.mainnet-beta.solana.com"
