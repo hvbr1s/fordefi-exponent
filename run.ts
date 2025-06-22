@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   }
 
   // Connect to Solana cluster
-  let connection = new Connection(clusterApiUrl(solanaCluster as any), "confirmed");
+  let connection = new Connection(await clusterApiUrl(solanaCluster as any), "confirmed");
 
   // Log market info at the start
   await getMarketInfo(exponentConfig.market, connection);
