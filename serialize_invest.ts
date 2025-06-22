@@ -68,7 +68,7 @@ async function createAndSerializeTransaction(
     units: 600_000, // it's a complex tx, we need a lot of CU!
   });
   const setComputeUnitPriceIx = ComputeBudgetProgram.setComputeUnitPrice({
-    microLamports: await getPriorityFees(), // Set a small priority fee
+    microLamports: await getPriorityFees(instructions, connection),
   });
   
   const messageV0 = new TransactionMessage({

@@ -7,8 +7,8 @@ import {
   sendPayloadToFordefi,
   getInstructions
 } from './serialize_invest';
-import { fordefiConfig, exponentConfig, rpcUrl } from './config';
-import { PublicKey, Connection } from '@solana/web3.js';
+import { fordefiConfig, exponentConfig, solanaCluster } from './config';
+import { PublicKey, Connection, clusterApiUrl } from '@solana/web3.js';
 
 async function main(): Promise<void> {
   if (!fordefiConfig.accessToken || !fordefiConfig.vaultId || !fordefiConfig.fordefiSolanaVaultAddress) {
@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   }
 
   // Connect to Solana cluster
-  let connection = new Connection(rpcUrl);
+  let connection = new Connection(clusterApiUrl(solanaCluster as any), "confirmed");
 
   // Log market info at the start
   await getMarketInfo(exponentConfig.market, connection);
