@@ -31,4 +31,4 @@ export const exponentConfig: ExponentConfig = {
   action: "buy", // buy -> to aquire PT tokens / sell -> to aquire fragSOL
 };
 
-export const rpcUrl = "https://api.mainnet-beta.solana.com"
+export const solanaCluster: "mainnet-beta" | "testnet" | "devnet" = "mainnet-beta"
